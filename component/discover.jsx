@@ -1,23 +1,28 @@
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, TextInput, View } from 'react-native';
+import { Dimensions, FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import React, { useEffect, useState } from 'react';
+
+const { width } = Dimensions.get('window');
 
 const Discover = ({ navigation }) => {
     const [movies, setMovies] = useState([]);
     const [genres, setGenres] = useState([]);
     const [selectedGenre, setSelectedGenre] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
 
     const API_KEY = '5ef212dfa67e7d4937c0cda7fd1362f6';
 
-    async function fetchMovies(genreId = null, query = '') {
-        let url = `https://api.themoviedb.org/3/discover/movie?language=en-US&api_key=${API_KEY}`;
+    async function fetchMovies(genreId = null, query = '', pageNumber = 1) {
+        let url = `https://api.themoviedb.org/3/discover/movie?language=en-US&page=${pageNumber}&api_key=${API_KEY}`;
         if (genreId) url += `&with_genres=${genreId}`;
-        if (query) url = `https://api.themoviedb.org/3/search/movie?language=en-US&api_key=${API_KEY}&query=${query}`;
+        if (query) url = `https://api.themoviedb.org/3/search/movie?language=en-US&page=${pageNumber}&api_key=${API_KEY}&query=${query}`;
         
         try {
             const response = await fetch(url);
             const data = await response.json();
-            setMovies(data.results);
+            setMovies(pageNumber === 1 ? data.results : [...movies, ...data.results]);
+            setTotalPages(data.total_pages);
         } catch (error) {
             console.error('Error fetching movies:', error);
         }
@@ -40,11 +45,20 @@ const Discover = ({ navigation }) => {
     }, []);
 
     const handleSearch = () => {
-        fetchMovies(null, searchQuery);
+        setPage(1);
+        fetchMovies(null, searchQuery, 1);
+    };
+
+    const loadMoreMovies = () => {
+        if (page < totalPages) {
+            const nextPage = page + 1;
+            setPage(nextPage);
+            fetchMovies(selectedGenre, searchQuery, nextPage);
+        }
     };
 
     return (
-        <ScrollView style={styles.container}>
+        <View style={styles.container}>
             <TextInput
                 style={styles.searchBar}
                 placeholder="Search Movies"
@@ -53,40 +67,51 @@ const Discover = ({ navigation }) => {
                 onChangeText={setSearchQuery}
                 onSubmitEditing={handleSearch}
             />
-            <ScrollView horizontal style={styles.genreList}>
-                {genres.map((genre) => (
-                    <TouchableOpacity 
-                        key={genre.id} 
+            <FlatList
+                horizontal
+                data={genres}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.genreList}
+                renderItem={({ item }) => (
+                    <TouchableOpacity
                         style={[
-                            styles.genreButton, 
-                            selectedGenre === genre.id && styles.selectedGenre
+                            styles.genreButton,
+                            selectedGenre === item.id && styles.selectedGenre,
                         ]}
                         onPress={() => {
-                            setSelectedGenre(genre.id);
-                            fetchMovies(genre.id);
+                            setSelectedGenre(item.id);
+                            setPage(1);
+                            fetchMovies(item.id, '', 1);
                         }}
                     >
-                        <Text style={styles.genreText}>{genre.name}</Text>
+                        <Text style={styles.genreText}>{item.name}</Text>
                     </TouchableOpacity>
-                ))}
-            </ScrollView>
-            <View style={styles.movies}>
-                {movies.map((movie, index) => (
-                    <TouchableOpacity 
-                        key={index} 
-                        style={styles.movieCard} 
-                        onPress={() => navigation.navigate('MovieDetails', { movie })}
+                )}
+            />
+            <FlatList
+                data={movies}
+                keyExtractor={(item) => item.id.toString()}
+                numColumns={2}
+                contentContainerStyle={styles.movieGrid}
+                renderItem={({ item }) => (
+                    <TouchableOpacity
+                        style={styles.movieCard}
+                        onPress={() => navigation.navigate('MovieDetails', { movie: item })}
                     >
-                        <Image 
-                            style={styles.poster} 
-                            source={{ uri: `https://image.tmdb.org/t/p/w500${movie.poster_path}` }} 
-                            resizeMode="cover" 
+                        <Image
+                            style={styles.poster}
+                            source={{ uri: `https://image.tmdb.org/t/p/w500${item.poster_path}` }}
+                            resizeMode="cover"
                         />
-                        <Text style={styles.movieTitle}>{movie.title}</Text>
+                        <Text style={styles.movieTitle} numberOfLines={1}>
+                            {item.title}
+                        </Text>
                     </TouchableOpacity>
-                ))}
-            </View>
-        </ScrollView>
+                )}
+                onEndReached={loadMoreMovies}
+                onEndReachedThreshold={0.5}
+            />
+        </View>
     );
 };
 
@@ -104,14 +129,16 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         backgroundColor: '#292b44',
         color: '#fff',
+        fontSize: 16,
     },
     genreList: {
-        marginVertical: 10,
         paddingHorizontal: 10,
+        paddingBottom: 10,
     },
     genreButton: {
+        height:38,
         padding: 10,
-        marginHorizontal: 5,
+        marginRight: 10,
         borderRadius: 20,
         backgroundColor: '#292b44',
     },
@@ -121,14 +148,12 @@ const styles = StyleSheet.create({
     genreText: {
         color: '#fff',
     },
-    movies: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-around',
-        padding: 10,
+    movieGrid: {
+        justifyContent: 'center',
+        paddingBottom: 20,
     },
     movieCard: {
-        width: 150,
+        width: (width / 2) - 20,
         margin: 10,
         backgroundColor: '#292b44',
         borderRadius: 15,
@@ -142,7 +167,7 @@ const styles = StyleSheet.create({
     },
     poster: {
         width: '100%',
-        height: 220,
+        height: 200,
         borderTopLeftRadius: 15,
         borderTopRightRadius: 15,
     },
