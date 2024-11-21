@@ -57,6 +57,7 @@ const MovieDetails = ({ route }) => {
                     <Text style={styles.noTrailer}>Trailer not available</Text>
                 )}
             </View>
+            <Text>sample text</Text>
 
             <Text style={styles.sectionTitle}>Cast & Crew</Text>
             <ScrollView horizontal style={styles.castContainer}>
