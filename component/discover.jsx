@@ -136,7 +136,6 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     genreButton: {
-        
         height:38,
         padding: 10,
         marginRight: 10,
